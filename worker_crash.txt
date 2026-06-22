@@ -1,0 +1,61 @@
+Traceback (most recent call last):
+  File "F:\Krish\venv\lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "F:\Krish\venv\lib\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+  File "C:\Users\LENOVOL\.pyenv\pyenv-win\versions\3.10.11\lib\http\client.py", line 1375, in getresponse
+    response.begin()
+  File "C:\Users\LENOVOL\.pyenv\pyenv-win\versions\3.10.11\lib\http\client.py", line 318, in begin
+    version, status, reason = self._read_status()
+  File "C:\Users\LENOVOL\.pyenv\pyenv-win\versions\3.10.11\lib\http\client.py", line 279, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "C:\Users\LENOVOL\.pyenv\pyenv-win\versions\3.10.11\lib\socket.py", line 705, in readinto
+    return self._sock.recv_into(b)
+TimeoutError: timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "F:\Krish\venv\lib\site-packages\requests\adapters.py", line 696, in send
+    resp = conn.urlopen(
+  File "F:\Krish\venv\lib\site-packages\urllib3\connectionpool.py", line 842, in urlopen
+    retries = retries.increment(
+  File "F:\Krish\venv\lib\site-packages\urllib3\util\retry.py", line 498, in increment
+    raise reraise(type(error), error, _stacktrace)
+  File "F:\Krish\venv\lib\site-packages\urllib3\util\util.py", line 39, in reraise
+    raise value
+  File "F:\Krish\venv\lib\site-packages\urllib3\connectionpool.py", line 788, in urlopen
+    response = self._make_request(
+  File "F:\Krish\venv\lib\site-packages\urllib3\connectionpool.py", line 536, in _make_request
+    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+  File "F:\Krish\venv\lib\site-packages\urllib3\connectionpool.py", line 367, in _raise_timeout
+    raise ReadTimeoutError(
+urllib3.exceptions.ReadTimeoutError: HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=120)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "F:\Krish\app\services\ai_service.py", line 128, in _call_ollama
+    response = requests.post(url, json=payload, timeout=120)
+  File "F:\Krish\venv\lib\site-packages\requests\api.py", line 134, in post
+    return request("post", url, data=data, json=json, **kwargs)
+  File "F:\Krish\venv\lib\site-packages\requests\api.py", line 71, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "F:\Krish\venv\lib\site-packages\requests\sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+  File "F:\Krish\venv\lib\site-packages\requests\sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+  File "F:\Krish\venv\lib\site-packages\requests\adapters.py", line 742, in send
+    raise ReadTimeout(e, request=request)
+requests.exceptions.ReadTimeout: HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=120)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "F:\Krish\app\worker.py", line 81, in _worker_sync_cycle
+    reply_body = ai_service.generate_reply(
+  File "F:\Krish\app\services\ai_service.py", line 213, in generate_reply
+    reply_text = self._call_ollama(self._get_system_prompt(), user_prompt)
+  File "F:\Krish\app\services\ai_service.py", line 139, in _call_ollama
+    raise Exception("❌ Ollama request timed out. The model may be loading.")
+Exception: ❌ Ollama request timed out. The model may be loading.

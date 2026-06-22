@@ -1,0 +1,33 @@
+# Environment
+.env
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Google OAuth
+credentials.json
+token.json
+data.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+~$*
+~$*.docx
+
+# Logs
+*.log
+logs/
+
+# Distribution
+dist/
+build/
+*.egg-info/

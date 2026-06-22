@@ -1,0 +1,19 @@
+# FastAPI & Server
+fastapi>=0.115.0
+uvicorn>=0.32.0
+
+# MCP Server
+fastmcp>=2.0.0
+
+# HTTP Client (for Ollama API calls)
+requests>=2.31.0
+
+# Google Gmail API
+google-api-python-client>=2.150.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.2.0
+
+# Configuration & Validation
+python-dotenv>=1.0.0
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
