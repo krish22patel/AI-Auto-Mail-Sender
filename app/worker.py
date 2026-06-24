@@ -429,7 +429,11 @@ async def _status_check_loop(ai_service: AIService, gmail_service) -> None:
             system_status["last_check"] = datetime.datetime.now(
                 datetime.timezone.utc
             ).isoformat()
-            if gmail_conn and ai_conn:
+            if not gmail_conn:
+                system_status["error_message"] = "Gmail API is disconnected. Please verify your credentials/token.json."
+            elif not ai_conn:
+                system_status["error_message"] = getattr(ai_service, "last_error", "AI service is disconnected.")
+            else:
                 system_status["error_message"] = None
         except Exception as e:
             system_status["error_message"] = str(e)

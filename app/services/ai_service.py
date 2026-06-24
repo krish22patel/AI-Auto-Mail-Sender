@@ -103,6 +103,7 @@ class AIService:
         self.anthropic_api_key = anthropic_api_key
         self.user_name = user_name
         self.user_email = user_email
+        self.last_error = None
 
         # Guard: ensure the chosen provider has credentials
         if self.provider == "huggingface" and not self.hf_token:
@@ -275,8 +276,16 @@ class AIService:
                 )
 
             except requests.ConnectionError as e:
+                print(
+                    f"[HF] Connection failed (attempt {attempt}/{self.hf_max_retries}): {e}. "
+                    f"Retrying in {delay:.0f}s..."
+                )
+                if attempt < self.hf_max_retries:
+                    time.sleep(delay)
+                    delay *= 2
+                    continue
                 raise Exception(
-                    f"❌ Could not connect to HuggingFace Router at {self.hf_api_url}: {e}"
+                    f"❌ Could not connect to HuggingFace Router at {self.hf_api_url} after {self.hf_max_retries} attempts: {e}"
                 )
 
             except Exception:
@@ -454,11 +463,16 @@ class AIService:
         For HuggingFace: validates the token with a lightweight whoami call.
         For Claude: checks that the API key is present (no live ping needed).
         """
+        self.last_error = None
         if self.provider == "claude":
-            return bool(self.anthropic_api_key)
+            if not self.anthropic_api_key:
+                self.last_error = "Anthropic API Key (ANTHROPIC_API_KEY) is missing in .env configuration."
+                return False
+            return True
 
         # HuggingFace: quick token validation
         if not self.hf_token:
+            self.last_error = "HuggingFace Token (HF_TOKEN) is missing in .env configuration."
             return False
         try:
             r = requests.get(
@@ -466,8 +480,15 @@ class AIService:
                 headers={"Authorization": f"Bearer {self.hf_token}"},
                 timeout=10,
             )
-            return r.status_code == 200
-        except Exception:
+            if r.status_code == 401:
+                self.last_error = "HuggingFace token authentication failed (401). Please check if your HF_TOKEN is valid."
+                return False
+            elif r.status_code != 200:
+                self.last_error = f"HuggingFace whoami check returned HTTP {r.status_code}: {r.text}"
+                return False
+            return True
+        except Exception as e:
+            self.last_error = f"Failed to connect to HuggingFace: {e}"
             return False
 
 
