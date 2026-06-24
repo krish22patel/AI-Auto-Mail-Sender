@@ -1,61 +1,74 @@
+
+--- 2026-06-24T11:51:19.920386 ---
 Traceback (most recent call last):
-  File "F:\Krish\venv\lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+  File "E:\ai email\app\worker.py", line 165, in process_email_task
+    email_detail = await asyncio.to_thread(gmail_service.get_email_details, msg_id)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\AppData\Local\Python\pythoncore-3.14-64\Lib\asyncio\threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\AppData\Local\Python\pythoncore-3.14-64\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\Dell\AppData\Local\Python\pythoncore-3.14-64\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "E:\ai email\app\services\gmail_service.py", line 236, in get_email_details
+    ).execute()
+      ~~~~~~~^^
+  File "E:\ai email\venv\Lib\site-packages\googleapiclient\_helpers.py", line 130, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "E:\ai email\venv\Lib\site-packages\googleapiclient\http.py", line 923, in execute
+    resp, content = _retry_request(
+                    ~~~~~~~~~~~~~~^
+        http,
+        ^^^^^
+    ...<7 lines>...
+        headers=self.headers,
+        ^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\ai email\venv\Lib\site-packages\googleapiclient\http.py", line 222, in _retry_request
+    raise exception
+  File "E:\ai email\venv\Lib\site-packages\googleapiclient\http.py", line 191, in _retry_request
+    resp, content = http.request(uri, method, *args, **kwargs)
+                    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\ai email\venv\Lib\site-packages\google_auth_httplib2.py", line 214, in request
+    response, content = self.http.request(
+                        ~~~~~~~~~~~~~~~~~^
+        uri,
+        ^^^^
+    ...<5 lines>...
+        **kwargs
+        ^^^^^^^^
+    )
+    ^
+  File "E:\ai email\venv\Lib\site-packages\httplib2\__init__.py", line 1727, in request
+    (response, content) = self._request(
+                          ~~~~~~~~~~~~~^
+        conn, authority, uri, request_uri, method, body, headers, redirections, cachekey,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\ai email\venv\Lib\site-packages\httplib2\__init__.py", line 1447, in _request
+    (response, content) = self._conn_request(conn, request_uri, method, body, headers)
+                          ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\ai email\venv\Lib\site-packages\httplib2\__init__.py", line 1399, in _conn_request
     response = conn.getresponse()
-  File "F:\Krish\venv\lib\site-packages\urllib3\connection.py", line 571, in getresponse
-    httplib_response = super().getresponse()
-  File "C:\Users\LENOVOL\.pyenv\pyenv-win\versions\3.10.11\lib\http\client.py", line 1375, in getresponse
+  File "C:\Users\Dell\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 1450, in getresponse
     response.begin()
-  File "C:\Users\LENOVOL\.pyenv\pyenv-win\versions\3.10.11\lib\http\client.py", line 318, in begin
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\Dell\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 336, in begin
     version, status, reason = self._read_status()
-  File "C:\Users\LENOVOL\.pyenv\pyenv-win\versions\3.10.11\lib\http\client.py", line 279, in _read_status
+                              ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Dell\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 297, in _read_status
     line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
-  File "C:\Users\LENOVOL\.pyenv\pyenv-win\versions\3.10.11\lib\socket.py", line 705, in readinto
+               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Dell\AppData\Local\Python\pythoncore-3.14-64\Lib\socket.py", line 725, in readinto
     return self._sock.recv_into(b)
-TimeoutError: timed out
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "F:\Krish\venv\lib\site-packages\requests\adapters.py", line 696, in send
-    resp = conn.urlopen(
-  File "F:\Krish\venv\lib\site-packages\urllib3\connectionpool.py", line 842, in urlopen
-    retries = retries.increment(
-  File "F:\Krish\venv\lib\site-packages\urllib3\util\retry.py", line 498, in increment
-    raise reraise(type(error), error, _stacktrace)
-  File "F:\Krish\venv\lib\site-packages\urllib3\util\util.py", line 39, in reraise
-    raise value
-  File "F:\Krish\venv\lib\site-packages\urllib3\connectionpool.py", line 788, in urlopen
-    response = self._make_request(
-  File "F:\Krish\venv\lib\site-packages\urllib3\connectionpool.py", line 536, in _make_request
-    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
-  File "F:\Krish\venv\lib\site-packages\urllib3\connectionpool.py", line 367, in _raise_timeout
-    raise ReadTimeoutError(
-urllib3.exceptions.ReadTimeoutError: HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=120)
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "F:\Krish\app\services\ai_service.py", line 128, in _call_ollama
-    response = requests.post(url, json=payload, timeout=120)
-  File "F:\Krish\venv\lib\site-packages\requests\api.py", line 134, in post
-    return request("post", url, data=data, json=json, **kwargs)
-  File "F:\Krish\venv\lib\site-packages\requests\api.py", line 71, in request
-    return session.request(method=method, url=url, **kwargs)
-  File "F:\Krish\venv\lib\site-packages\requests\sessions.py", line 651, in request
-    resp = self.send(prep, **send_kwargs)
-  File "F:\Krish\venv\lib\site-packages\requests\sessions.py", line 784, in send
-    r = adapter.send(request, **kwargs)
-  File "F:\Krish\venv\lib\site-packages\requests\adapters.py", line 742, in send
-    raise ReadTimeout(e, request=request)
-requests.exceptions.ReadTimeout: HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=120)
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "F:\Krish\app\worker.py", line 81, in _worker_sync_cycle
-    reply_body = ai_service.generate_reply(
-  File "F:\Krish\app\services\ai_service.py", line 213, in generate_reply
-    reply_text = self._call_ollama(self._get_system_prompt(), user_prompt)
-  File "F:\Krish\app\services\ai_service.py", line 139, in _call_ollama
-    raise Exception("❌ Ollama request timed out. The model may be loading.")
-Exception: ❌ Ollama request timed out. The model may be loading.
+           ~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\Dell\AppData\Local\Python\pythoncore-3.14-64\Lib\ssl.py", line 1304, in recv_into
+    return self.read(nbytes, buffer)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\AppData\Local\Python\pythoncore-3.14-64\Lib\ssl.py", line 1138, in read
+    return self._sslobj.read(len, buffer)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+TimeoutError: The read operation timed out

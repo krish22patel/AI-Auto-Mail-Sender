@@ -54,8 +54,6 @@ let isConnected = false;
 const els = {};
 
 document.addEventListener('DOMContentLoaded', () => {
-    els.liveDot    = document.getElementById('live-dot');
-    els.liveLabel  = document.getElementById('live-label');
     els.pending    = document.getElementById('pending-count');
     els.captured   = document.getElementById('captured-count');
     els.sent       = document.getElementById('sent-count');
@@ -116,8 +114,21 @@ async function fetchStatus() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        // Connection indicator
-        setConnected(true);
+        // Connection indicators
+        const sys = data.system_status || {};
+        updateConnectionStatuses(true, !!sys.gmail_connected, !!sys.ai_connected);
+
+        // Handle error alert banner
+        const alertBanner = document.getElementById('alert-banner');
+        const alertDesc = document.getElementById('alert-desc');
+        if (alertBanner && alertDesc) {
+            if (sys.error_message) {
+                alertDesc.textContent = sys.error_message;
+                alertBanner.style.display = 'flex';
+            } else {
+                alertBanner.style.display = 'none';
+            }
+        }
 
         // Update brand name/email dynamically if returned
         if (data.user_name) {
@@ -146,7 +157,13 @@ async function fetchStatus() {
         els.lastUpdate.textContent = 'Updated ' + formatRelativeTime(new Date().toISOString());
 
     } catch (err) {
-        setConnected(false);
+        updateConnectionStatuses(false, false, false);
+        const alertBanner = document.getElementById('alert-banner');
+        const alertDesc = document.getElementById('alert-desc');
+        if (alertBanner && alertDesc) {
+            alertDesc.textContent = 'Backend server is disconnected. Please make sure the FastAPI application is running.';
+            alertBanner.style.display = 'flex';
+        }
         console.error('[Status] Failed:', err);
     }
 }
@@ -357,10 +374,20 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ── Connection Indicator ──────────────────────────────────────
-function setConnected(ok) {
-    isConnected = ok;
-    els.liveDot.className = 'live-dot ' + (ok ? 'connected' : 'error');
-    els.liveLabel.textContent = ok ? 'Connected' : 'Disconnected';
+function updateConnectionStatuses(apiOk, gmailOk, aiOk) {
+    const apiDot = document.querySelector('.status-dot--api');
+    const gmailDot = document.querySelector('.status-dot--gmail');
+    const aiDot = document.querySelector('.status-dot--ai');
+    
+    if (apiDot) {
+        apiDot.className = 'status-dot status-dot--api ' + (apiOk ? 'connected pulse' : 'error');
+    }
+    if (gmailDot) {
+        gmailDot.className = 'status-dot status-dot--gmail ' + (gmailOk ? 'connected' : 'error');
+    }
+    if (aiDot) {
+        aiDot.className = 'status-dot status-dot--ai ' + (aiOk ? 'connected' : 'error');
+    }
 }
 
 // ── Animated number counter ───────────────────────────────────

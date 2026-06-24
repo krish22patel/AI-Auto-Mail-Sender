@@ -166,36 +166,96 @@ body {
     margin-top: 2px;
 }
 
-.header-live {
+.header-status-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: var(--r-pill);
-    padding: 8px 16px;
+    padding: 6px 12px;
     box-shadow: var(--neu-shadow-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: all var(--t-fast);
 }
 
-.live-dot {
-    width: 9px; height: 9px;
+.status-dot {
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--text-muted);
     transition: background var(--t-slow);
-    animation: none;
 }
-.live-dot.connected { background: var(--success); animation: pulse 2s ease-in-out infinite; }
-.live-dot.error { background: var(--danger); }
+
+.status-dot.connected {
+    background: var(--success);
+    box-shadow: 0 0 8px rgba(34, 201, 139, 0.4);
+}
+
+.status-dot.connected.pulse {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.status-dot.error {
+    background: var(--danger);
+    box-shadow: 0 0 8px rgba(240, 90, 90, 0.4);
+}
 
 @keyframes pulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(34, 201, 139, 0.5); }
     50%       { box-shadow: 0 0 0 5px rgba(34, 201, 139, 0); }
 }
 
-.live-label {
-    font-size: 0.8rem;
+.status-text {
+    font-size: 0.75rem;
     font-weight: 600;
     color: var(--text-secondary);
+}
+
+/* ── ALERT BANNER ── */
+.alert-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: var(--danger-soft);
+    border: 1px solid rgba(240, 90, 90, 0.3);
+    border-radius: var(--r-md);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    box-shadow: var(--glass-shadow);
+    animation: slideIn 0.3s ease;
+}
+
+.alert-icon {
+    color: var(--danger);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.alert-content {
+    flex-grow: 1;
+}
+
+.alert-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--danger);
+    margin: 0 0 4px 0;
+}
+
+.alert-desc {
+    font-size: 0.8rem;
+    color: #7f1d1d;
+    margin: 0;
+    line-height: 1.4;
 }
 
 /* ============================================================

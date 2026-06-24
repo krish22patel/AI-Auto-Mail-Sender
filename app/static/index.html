@@ -28,15 +28,40 @@
                     </svg>
                 </div>
                 <div>
-                    <h1 class="brand-name">Kishan Vadsola's AI Agent</h1>
-                    <p class="brand-sub">vadsolakishan1310@gmail.com</p>
+                    <h1 class="brand-name">Krish Patel's AI Agent</h1>
+                    <p class="brand-sub">krish22patel07@gmail.com</p>
                 </div>
             </div>
-            <div class="header-live">
-                <span class="live-dot" id="live-dot" aria-label="Connection status"></span>
-                <span id="live-label" class="live-label">Connecting...</span>
+            <div class="header-status-group">
+                <div class="status-indicator" id="status-api" title="FastAPI Backend Server Status">
+                    <span class="status-dot status-dot--api"></span>
+                    <span class="status-text">Backend</span>
+                </div>
+                <div class="status-indicator" id="status-gmail" title="Google Gmail API Authorization Status">
+                    <span class="status-dot status-dot--gmail"></span>
+                    <span class="status-text">Gmail API</span>
+                </div>
+                <div class="status-indicator" id="status-ai" title="AI Provider (Claude/Ollama) Status">
+                    <span class="status-dot status-dot--ai"></span>
+                    <span class="status-text">AI Brain</span>
+                </div>
             </div>
         </header>
+
+        <!-- ── ERROR BANNER ── -->
+        <div class="alert-banner" id="alert-banner" style="display: none;" role="alert">
+            <div class="alert-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+            </div>
+            <div class="alert-content">
+                <h4 class="alert-title">System Error Detected</h4>
+                <p class="alert-desc" id="alert-desc">Error details go here...</p>
+            </div>
+        </div>
 
         <!-- ── STATS ROW ── -->
         <section class="stats-row" aria-label="Statistics">

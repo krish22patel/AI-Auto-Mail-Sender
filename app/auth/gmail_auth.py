@@ -8,6 +8,7 @@ Handles the OAuth2 flow for Gmail API access, including:
 """
 
 import os
+import threading
 from pathlib import Path
 
 from google.auth.transport.requests import Request
@@ -32,7 +33,7 @@ class GmailAuthenticator:
         """
         self.credentials_path = credentials_path
         self.token_path = token_path
-        self._service = None
+        self._thread_local = threading.local()
 
     def authenticate(self) -> Credentials:
         """
@@ -88,11 +89,12 @@ class GmailAuthenticator:
         Returns:
             Gmail API service object (googleapiclient.discovery.Resource)
         """
-        if self._service is None:
+        if not hasattr(self._thread_local, "service") or self._thread_local.service is None:
             creds = self.authenticate()
-            self._service = build("gmail", "v1", credentials=creds)
-            print("[OK] Gmail API service initialized!")
-        return self._service
+            # Explicitly set static_discovery=True to avoid network requests on build
+            self._thread_local.service = build("gmail", "v1", credentials=creds, static_discovery=True)
+            print(f"[OK] Gmail API service initialized for thread {threading.get_ident()}!")
+        return self._thread_local.service
 
 
 # Singleton instance for the application

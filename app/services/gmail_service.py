@@ -19,6 +19,38 @@ from app.schemas.email_schemas import EmailSummary, EmailDetail
 from app.config import settings
 
 
+def execute_with_retry(request, retries=3, backoff=2):
+    """
+    Execute a Google API request with retries and exponential backoff.
+
+    Handles socket.timeout, TimeoutError, ConnectionError, and HTTP 429/5xx.
+    """
+    import socket
+    import time
+    from googleapiclient.errors import HttpError
+
+    last_err = None
+    for attempt in range(retries):
+        try:
+            return request.execute()
+        except (socket.timeout, TimeoutError, ConnectionError) as e:
+            last_err = e
+            print(f"[Gmail API] Timeout/Connection error on attempt {attempt+1}: {e}. Retrying in {backoff ** attempt}s...")
+            time.sleep(backoff ** attempt)
+        except HttpError as e:
+            if e.resp.status in [429, 500, 502, 503, 504]:
+                last_err = e
+                print(f"[Gmail API] HTTP error {e.resp.status} on attempt {attempt+1}. Retrying in {backoff ** attempt}s...")
+                time.sleep(backoff ** attempt)
+            else:
+                raise e
+        except Exception as e:
+            last_err = e
+            print(f"[Gmail API] Unexpected error on attempt {attempt+1}: {e}. Retrying in {backoff ** attempt}s...")
+            time.sleep(backoff ** attempt)
+    raise last_err
+
+
 class GmailService:
     """Service for interacting with the Gmail API."""
 
@@ -32,15 +64,13 @@ class GmailService:
         """
         self.credentials_path = credentials_path
         self.token_path = token_path
-        self._service = None
         self._auto_reply_label_id = None
 
     @property
     def service(self):
         """Lazy-load the Gmail API service."""
-        if self._service is None:
-            self._service = get_gmail_service(self.credentials_path, self.token_path)
-        return self._service
+        # Always call get_gmail_service to retrieve the thread-local instance
+        return get_gmail_service(self.credentials_path, self.token_path)
 
     def _get_header(self, headers: list[dict], name: str) -> str:
         """Extract a header value from Gmail message headers."""
@@ -126,7 +156,7 @@ class GmailService:
             if page_token:
                 kwargs["pageToken"] = page_token
 
-            results = self.service.users().messages().list(**kwargs).execute()
+            results = execute_with_retry(self.service.users().messages().list(**kwargs))
             batch = results.get("messages", [])
             messages.extend(batch)
 
@@ -141,12 +171,14 @@ class GmailService:
         summaries = []
         for msg_ref in msg_refs:
             try:
-                msg = self.service.users().messages().get(
-                    userId="me",
-                    id=msg_ref["id"],
-                    format="metadata",
-                    metadataHeaders=["From", "Subject", "Date"]
-                ).execute()
+                msg = execute_with_retry(
+                    self.service.users().messages().get(
+                        userId="me",
+                        id=msg_ref["id"],
+                        format="metadata",
+                        metadataHeaders=["From", "Subject", "Date"]
+                    )
+                )
 
                 headers = msg.get("payload", {}).get("headers", [])
                 sender_raw = self._get_header(headers, "From")
@@ -186,10 +218,9 @@ class GmailService:
         query = "is:unread -in:spam -in:trash -in:sent"
 
         if exclude_auto_replied:
-            label = self._get_or_create_label()
-            if label:
-                # Quote label name in case it has special chars
-                query += f' -label:"{label}"'
+            self._get_or_create_label(settings.AUTO_REPLY_LABEL)
+            # Quote label name in case it has special chars
+            query += f' -label:"{settings.AUTO_REPLY_LABEL}"'
 
         print(f"[Gmail] Query: {query}")
         msg_refs = self._fetch_messages(query, max_results)
@@ -230,11 +261,13 @@ class GmailService:
         Returns:
             EmailDetail object with full body content
         """
-        msg = self.service.users().messages().get(
-            userId="me",
-            id=email_id,
-            format="full"
-        ).execute()
+        msg = execute_with_retry(
+            self.service.users().messages().get(
+                userId="me",
+                id=email_id,
+                format="full"
+            )
+        )
 
         headers = msg.get("payload", {}).get("headers", [])
         sender_raw = self._get_header(headers, "From")
@@ -255,6 +288,30 @@ class GmailService:
             date=self._get_header(headers, "Date"),
             labels=msg.get("labelIds", [])
         )
+
+    def get_email_metadata(self, email_id: str) -> dict:
+        """Fetch minimal Gmail message metadata for filtering and dashboard capture."""
+        request = self.service.users().messages().get(
+            userId="me",
+            id=email_id,
+            format="metadata",
+            metadataHeaders=["From", "Subject", "Date"]
+        )
+        msg = execute_with_retry(request)
+        headers = msg.get("payload", {}).get("headers", [])
+        header_map = {h["name"].lower(): h["value"] for h in headers}
+
+        sender_raw = header_map.get("from", "")
+        sender_name, sender_email = self._parse_sender(sender_raw)
+
+        return {
+            "id": msg.get("id"),
+            "sender": sender_email,
+            "sender_name": sender_name,
+            "subject": header_map.get("subject", "(No Subject)"),
+            "snippet": msg.get("snippet", ""),
+            "date": header_map.get("date", ""),
+        }
 
     def send_reply(self, email_id: str, reply_text: str) -> dict:
         """
@@ -287,13 +344,15 @@ class GmailService:
         ).decode("utf-8")
 
         # Send as reply in the same thread
-        sent_message = self.service.users().messages().send(
-            userId="me",
-            body={
-                "raw": raw_message,
-                "threadId": original.thread_id
-            }
-        ).execute()
+        sent_message = execute_with_retry(
+            self.service.users().messages().send(
+                userId="me",
+                body={
+                    "raw": raw_message,
+                    "threadId": original.thread_id
+                }
+            )
+        )
 
         # Mark original as auto-replied
         self.mark_as_auto_replied(email_id)
@@ -308,16 +367,18 @@ class GmailService:
         Args:
             email_id: Gmail message ID
         """
-        label_id = self._get_or_create_label()
+        label_id = self._get_or_create_label(settings.AUTO_REPLY_LABEL)
         if label_id:
-            self.service.users().messages().modify(
-                userId="me",
-                id=email_id,
-                body={
-                    "addLabelIds": [label_id],
-                    "removeLabelIds": ["UNREAD"]
-                }
-            ).execute()
+            execute_with_retry(
+                self.service.users().messages().modify(
+                    userId="me",
+                    id=email_id,
+                    body={
+                        "addLabelIds": [label_id],
+                        "removeLabelIds": ["UNREAD"]
+                    }
+                )
+            )
 
     def _get_or_create_label(self, label_name: str = "auto-replied") -> Optional[str]:
         """
@@ -333,7 +394,7 @@ class GmailService:
             return self._auto_reply_label_id
 
         # Check existing labels
-        results = self.service.users().labels().list(userId="me").execute()
+        results = execute_with_retry(self.service.users().labels().list(userId="me"))
         labels = results.get("labels", [])
 
         for label in labels:
@@ -352,10 +413,12 @@ class GmailService:
                     "textColor": "#ffffff"
                 }
             }
-            created_label = self.service.users().labels().create(
-                userId="me",
-                body=label_body
-            ).execute()
+            created_label = execute_with_retry(
+                self.service.users().labels().create(
+                    userId="me",
+                    body=label_body
+                )
+            )
             self._auto_reply_label_id = created_label["id"]
             print(f"✅ Created Gmail label: '{label_name}'")
             return self._auto_reply_label_id
@@ -374,11 +437,13 @@ class GmailService:
         Returns:
             List of EmailSummary objects matching the query
         """
-        results = self.service.users().messages().list(
-            userId="me",
-            q=query,
-            maxResults=max_results
-        ).execute()
+        results = execute_with_retry(
+            self.service.users().messages().list(
+                userId="me",
+                q=query,
+                maxResults=max_results
+            )
+        )
 
         messages = results.get("messages", [])
         if not messages:
@@ -386,12 +451,14 @@ class GmailService:
 
         email_summaries = []
         for msg_ref in messages:
-            msg = self.service.users().messages().get(
-                userId="me",
-                id=msg_ref["id"],
-                format="metadata",
-                metadataHeaders=["From", "Subject", "Date"]
-            ).execute()
+            msg = execute_with_retry(
+                self.service.users().messages().get(
+                    userId="me",
+                    id=msg_ref["id"],
+                    format="metadata",
+                    metadataHeaders=["From", "Subject", "Date"]
+                )
+            )
 
             headers = msg.get("payload", {}).get("headers", [])
             sender_raw = self._get_header(headers, "From")
@@ -413,7 +480,7 @@ class GmailService:
     def is_connected(self) -> bool:
         """Check if Gmail API is connected and authenticated."""
         try:
-            self.service.users().getProfile(userId="me").execute()
+            execute_with_retry(self.service.users().getProfile(userId="me"))
             return True
         except Exception:
             return False

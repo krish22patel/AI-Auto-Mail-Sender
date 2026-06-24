@@ -301,8 +301,8 @@ def generate_report():
     meta_table.columns[1].width = Inches(4.0)
     
     metadata_rows = [
-        ("Candidate Name:", "Kishan Vadsola"),
-        ("Email Address:", "vadsolakishan1310@gmail.com"),
+        ("Candidate Name:", "Krish Patel"),
+        ("Email Address:", "krish22patel07@gmail.com"),
         ("Project Role:", "Software Engineering Intern"),
         ("Host Organization:", "[Internship Company Name]"),
         ("Project Supervisor:", "[Company Supervisor's Name / 'Sir']"),

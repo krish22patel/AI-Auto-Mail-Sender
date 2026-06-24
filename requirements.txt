@@ -5,7 +5,8 @@ uvicorn>=0.32.0
 # MCP Server
 fastmcp>=2.0.0
 
-# HTTP Client (for Ollama API calls)
+# HTTP Client
+# Used for HuggingFace Router API calls (ai_service.py) and Claude API calls.
 requests>=2.31.0
 
 # Google Gmail API
@@ -17,3 +18,6 @@ google-auth-oauthlib>=1.2.0
 python-dotenv>=1.0.0
 pydantic>=2.10.0
 pydantic-settings>=2.6.0
+
+# Report Generation
+python-docx>=1.1.0

@@ -2,7 +2,7 @@ import sqlite3
 import os
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 DB_PATH = Path(os.getcwd()) / "data.db"
 
@@ -22,6 +22,8 @@ def init_db():
     # Ensure default service state is OFF and count is 0
     cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('is_auto_reply_on', 'false')")
     cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('pending_count', '0')")
+    # Gmail Push: track last processed historyId (0 = not yet known / do full fetch)
+    cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('last_history_id', '0')")
     
     # Email logs table (auto-replied emails)
     cursor.execute("""
@@ -217,11 +219,45 @@ def get_inbox_count() -> int:
     conn.close()
     return result[0] if result else 0
 
-def get_inbox_count() -> int:
-    """Get the total number of captured inbox emails."""
+
+# ---------------------------------------------------------------------------
+# Gmail Push Notification: historyId persistence
+# ---------------------------------------------------------------------------
+
+def get_last_history_id() -> Optional[int]:
+    """
+    Retrieve the last Gmail historyId that was successfully processed.
+
+    Returns 0 (or None) when no history has been recorded yet — the caller
+    should fall back to a full unread-email fetch in that case.
+    """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM inbox_emails")
+    cursor.execute("SELECT value FROM settings WHERE key = 'last_history_id'")
     result = cursor.fetchone()
     conn.close()
-    return result[0] if result else 0
+    if result and result[0] and result[0] != '0':
+        return int(result[0])
+    return None
+
+
+def set_last_history_id(history_id: int) -> None:
+    """
+    Persist the latest successfully processed Gmail historyId.
+
+    This is called after every successful webhook notification so that if the
+    server restarts, we can resume from exactly where we left off using the
+    Gmail History API — guaranteeing zero message loss.
+
+    Parameters
+    ----------
+    history_id : int  — The new historyId to persist.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE settings SET value = ? WHERE key = 'last_history_id'",
+        (str(history_id),)
+    )
+    conn.commit()
+    conn.close()
