@@ -70,8 +70,23 @@ def set_service_state(is_on: bool):
     cursor = conn.cursor()
     val = 'true' if is_on else 'false'
     cursor.execute("UPDATE settings SET value = ? WHERE key = 'is_auto_reply_on'", (val,))
+    if is_on:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('service_start_time', ?)", (now,))
+    else:
+        cursor.execute("DELETE FROM settings WHERE key = 'service_start_time'")
     conn.commit()
     conn.close()
+
+def get_service_start_time() -> Optional[str]:
+    """Retrieve the service start timestamp (UTC)."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM settings WHERE key = 'service_start_time'")
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
 
 def log_email(message_id: str, sender: str, subject: str, reply_body: str):
     """Log an email that was auto-replied to."""

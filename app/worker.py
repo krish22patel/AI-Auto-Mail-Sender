@@ -296,29 +296,47 @@ async def _process_and_done(
 
 async def _startup_catchup(ai_service: AIService, gmail_service) -> None:
     """
-    On startup, fetch any unread emails that arrived while the server was
-    offline and enqueue them for processing.
-
-    This covers the gap between the last server shutdown and now,
-    complementing the interrupt-driven flow for ongoing operation.
+    On startup or toggle ON, fetch any unread emails that arrived within
+    the active service interval, and enqueue them for processing.
     """
     logger.info(
-        "[WORKER] Running startup catch-up fetch (max %d emails)…",
+        "[WORKER] Running catch-up fetch (max %d emails)…",
         settings.STARTUP_CATCHUP_LIMIT,
     )
 
     try:
+        is_on = await asyncio.to_thread(db.is_service_on)
+        if not is_on:
+            logger.info("[WORKER] Service is OFF — skipping catch-up fetch.")
+            await asyncio.to_thread(db.set_pending_count, 0)
+            return
+
+        start_time_str = await asyncio.to_thread(db.get_service_start_time)
+        start_dt = None
+        if start_time_str:
+            start_dt = datetime.datetime.fromisoformat(start_time_str)
+
         unread_emails = await asyncio.to_thread(
             gmail_service.list_unread_emails,
             settings.STARTUP_CATCHUP_LIMIT,
         )
-        await asyncio.to_thread(db.set_pending_count, len(unread_emails))
 
-        is_on = await asyncio.to_thread(db.is_service_on)
         queue = get_email_queue()
         enqueued = 0
+        captured = 0
 
         for email in unread_emails:
+            # Check email date. Only allow emails received on or after service_start_time.
+            if start_dt and email.date:
+                import email.utils
+                try:
+                    email_dt = email.utils.parsedate_to_datetime(email.date)
+                    if email_dt < start_dt:
+                        # Skip emails before the start time
+                        continue
+                except Exception as e:
+                    logger.warning("[WORKER] Catch-up failed to parse email date %s: %s", email.date, e)
+
             sender_lower = email.sender.lower()
 
             if any(kw in sender_lower for kw in SKIP_KEYWORDS):
@@ -330,39 +348,35 @@ async def _startup_catchup(ai_service: AIService, gmail_service) -> None:
             if is_replied:
                 continue
 
-            if is_on:
-                await queue.put(email.id)
-                enqueued += 1
+            # Capture in dashboard database immediately
+            try:
+                await asyncio.to_thread(
+                    db.capture_inbox_email,
+                    message_id=email.id,
+                    sender=email.sender,
+                    sender_name=email.sender_name,
+                    subject=email.subject,
+                    snippet=email.snippet,
+                    date=email.date,
+                )
+                captured += 1
+            except Exception as e:
+                logger.error("[WORKER] Catch-up failed to capture email %s: %s", email.id, e)
+
+            await queue.put(email.id)
+            enqueued += 1
+
+        await asyncio.to_thread(db.set_pending_count, enqueued)
 
         logger.info(
-            "[WORKER] Startup catch-up: %d unread found, %d enqueued for reply.",
+            "[WORKER] Catch-up complete: %d unread emails found, %d captured in DB, %d enqueued for reply.",
             len(unread_emails),
+            captured,
             enqueued,
         )
 
-        # Also capture inbox snapshot for the dashboard
-        recent_emails = await asyncio.to_thread(
-            gmail_service.list_recent_emails, 200, 7
-        )
-
-        def capture_all():
-            for em in recent_emails:
-                db.capture_inbox_email(
-                    message_id=em.id,
-                    sender=em.sender,
-                    sender_name=em.sender_name,
-                    subject=em.subject,
-                    snippet=em.snippet,
-                    date=em.date,
-                )
-
-        await asyncio.to_thread(capture_all)
-        logger.info(
-            "[WORKER] Inbox snapshot captured: %d recent emails.", len(recent_emails)
-        )
-
     except Exception:
-        logger.error("[WORKER] Startup catch-up failed:\n%s", traceback.format_exc())
+        logger.error("[WORKER] Catch-up failed:\n%s", traceback.format_exc())
 
 
 # ---------------------------------------------------------------------------

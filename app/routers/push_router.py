@@ -153,6 +153,16 @@ async def _handle_new_messages(new_history_id: int) -> None:
 
         # --- Filter, capture, and optionally enqueue ---
         is_on = await asyncio.to_thread(db.is_service_on)
+        if not is_on:
+            logger.info("[Webhook] Auto-reply is OFF — discarding incoming notifications completely.")
+            return
+
+        start_time_str = await asyncio.to_thread(db.get_service_start_time)
+        start_dt = None
+        if start_time_str:
+            import datetime
+            start_dt = datetime.datetime.fromisoformat(start_time_str)
+
         queue = get_email_queue()
         enqueued = 0
         captured = 0
@@ -169,6 +179,18 @@ async def _handle_new_messages(new_history_id: int) -> None:
 
             sender = msg_meta.get("sender", "")
             subject = msg_meta.get("subject", "")
+            email_date_raw = msg_meta.get("date", "")
+
+            # Filter by service start time so we don't process or show pre-mails
+            if start_dt and email_date_raw:
+                import email.utils
+                try:
+                    email_dt = email.utils.parsedate_to_datetime(email_date_raw)
+                    if email_dt < start_dt:
+                        logger.info("[Webhook] Discarding pre-mail (date %s is before service start time %s): %s", email_dt, start_dt, msg_id)
+                        continue
+                except Exception as e:
+                    logger.warning("[Webhook] Failed to parse date %s: %s. Proceeding.", email_date_raw, e)
 
             # Capture in DB inbox_emails immediately so it shows in the dashboard
             try:
@@ -179,16 +201,11 @@ async def _handle_new_messages(new_history_id: int) -> None:
                     sender_name=msg_meta.get("sender_name", ""),
                     subject=subject,
                     snippet=msg_meta.get("snippet", ""),
-                    date=msg_meta.get("date", ""),
+                    date=email_date_raw,
                 )
                 captured += 1
             except Exception as e:
                 logger.error("[Webhook] Failed to capture inbox email %s in DB: %s", msg_id, e)
-
-            # If auto-reply is OFF, skip processing but keep email recorded in DB
-            if not is_on:
-                logger.info("[Webhook] Auto-reply is OFF — captured %s but skipping enqueue.", msg_id)
-                continue
 
             # Skip automated / newsletter senders
             if any(kw in sender.lower() for kw in SKIP_KEYWORDS):
@@ -211,11 +228,10 @@ async def _handle_new_messages(new_history_id: int) -> None:
             logger.info("[Webhook] Enqueued message %s (%s | %s)", msg_id, sender, subject)
 
         logger.info(
-            "[Webhook] Done. Captured %d emails. Enqueued %d/%d for processing (Service is %s).",
+            "[Webhook] Done. Captured %d emails. Enqueued %d/%d for processing.",
             captured,
             enqueued,
             len(new_msg_ids),
-            "ON" if is_on else "OFF",
         )
 
     except Exception as e:
