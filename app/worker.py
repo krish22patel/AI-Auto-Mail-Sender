@@ -536,3 +536,63 @@ async def auto_reply_worker() -> None:
         _watch_renewal_loop(gmail_service),
         _status_check_loop(ai_service, gmail_service),
     )
+
+
+def clear_email_queue() -> None:
+    """Clear all pending tasks from the email queue."""
+    queue = get_email_queue()
+    size = queue.qsize()
+    logger.info("[WORKER] Clearing email queue — discarded %d pending messages.", size)
+    while not queue.empty():
+        try:
+            queue.get_nowait()
+            queue.task_done()
+        except (asyncio.QueueEmpty, ValueError):
+            break
+
+
+def reset_worker_status() -> None:
+    """Reset worker UI slot statuses to Idle."""
+    global worker_status
+    logger.info("[WORKER] Resetting all worker slot statuses to Idle.")
+    for slot in worker_status:
+        slot["status"] = "Idle"
+        slot["task"] = None
+
+
+async def trigger_catchup_task() -> None:
+    """Run catchup scan to process missed emails when the engine is toggled ON."""
+    logger.info("[WORKER] Service toggled ON — triggering catch-up scan...")
+
+    # Check if the service is actually ON first
+    is_on = await asyncio.to_thread(db.is_service_on)
+    if not is_on:
+        logger.info("[WORKER] Service toggled ON signal received but state is OFF — aborting catch-up.")
+        return
+
+    # Build services using settings
+    from app.services.ai_service import AIService
+    from app.services.gmail_service import get_gmail_service_instance
+    ai_service = AIService(
+        provider=settings.AI_PROVIDER,
+        model=(
+            settings.HF_MODEL
+            if settings.AI_PROVIDER == "huggingface"
+            else settings.CLAUDE_MODEL
+        ),
+        tone=settings.REPLY_TONE,
+        hf_token=settings.HF_TOKEN,
+        hf_api_url=settings.HF_API_URL,
+        hf_max_retries=settings.HF_MAX_RETRIES,
+        hf_retry_delay=settings.HF_RETRY_DELAY,
+        hf_timeout=settings.HF_TIMEOUT,
+        anthropic_api_key=settings.ANTHROPIC_API_KEY,
+        user_name=settings.USER_NAME,
+        user_email=settings.USER_EMAIL,
+    )
+    gmail_service = get_gmail_service_instance(
+        credentials_path=settings.GMAIL_CREDENTIALS_PATH,
+        token_path=settings.GMAIL_TOKEN_PATH,
+    )
+    await _startup_catchup(ai_service, gmail_service)
+

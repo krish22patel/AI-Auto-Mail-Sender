@@ -28,15 +28,23 @@ async def get_status():
     }
 
 @router.post("/toggle")
-async def toggle_service(req: ToggleRequest):
+async def toggle_service(req: ToggleRequest, background_tasks: BackgroundTasks):
     """Turn the auto-reply service ON or OFF."""
     db.set_service_state(req.service_on)
+    if req.service_on:
+        from app.worker import trigger_catchup_task
+        background_tasks.add_task(trigger_catchup_task)
+    else:
+        from app.worker import clear_email_queue, reset_worker_status
+        clear_email_queue()
+        reset_worker_status()
+        db.set_pending_count(0)
     return {"status": "success", "service_on": req.service_on}
 
 @router.post("/settings/toggle")
-async def toggle_service_alias(req: ToggleRequest):
+async def toggle_service_alias(req: ToggleRequest, background_tasks: BackgroundTasks):
     """Alias route for settings/toggle as documented in internship report."""
-    return await toggle_service(req)
+    return await toggle_service(req, background_tasks)
 
 @router.get("/logs")
 async def get_logs():
